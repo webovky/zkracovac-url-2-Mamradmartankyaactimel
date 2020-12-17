@@ -6,6 +6,7 @@ from .models import User, Shortener
 from pony.orm import db_session
 import string
 import random
+import pyshorteners
 
 # from werkzeug.security import check_password_hash
 
@@ -21,19 +22,23 @@ def login_required(function):
     return wrapper
 
 
+
 @app.route("/", methods=["GET"])
 def index():
-    shortcut = "".join([random.choice(string.ascii_letters) for i in range(7)])
-    print(shortcut)
+    #url = input("zadej url")
+    url = ("shortener")
+    s = pyshorteners.Shortener().tinyurl.short(url)
+    print("Your shorted is -->", s)
+    zprava = s
 
-    if "user" in sessin:
+    if "user" in session:
         user = User.get(login=session["user"])
         for addr in user.addresses:
             print(addr.shortcut, addr.url)
 
     return render_template("base.html.j2")
 
-
+    
 @app.route("/<string:shortcut>", methods=["GET"])
 def short_redirect(shortcut):
     shortener = Shortener.get(shortcut=shortcut)
@@ -50,17 +55,26 @@ def adduser():
 @app.route("/adduser/", methods=["POST"])
 @db_session
 def adduser_post():
-    login = None
-    passwd1 = None
-    passwd2 = None
-    user = User.get(email="nozka@spseol.cz")
-    user = User[login]  # do [] jen primární klíč
+    login = request.form.get("login")
+    passwd1 = request.form.get("passwd1")
+    passwd2 = request.form.get("passwd2")
+    if login:
+        user = User.get(login=login)
+    else:
+        flash("Prázdný formulář!")
+        return redirect(url_for("adduser"))
+        
+    #user = User[login]  # do [] jen primární klíč
     if user:
         flash("Uživatel již existuje. Zvolte si jiné uživatelské jméno.")
         print(user.login, user.password)
-    if len(passwd1) >= 5 and passwd1 == passwd2:
+        return redirect(url_for("adduser"))
+    elif len(passwd1) >= 5 and passwd1 == passwd2:
         user = User(login=login, password=generate_password_hash(passwd1))
-        flash("účet vytvořen")
+        flash("Účet vytvořen")
+        session["user"] = login
+        flash("Byl jsi přihlášen!")
+
     else:
         flash("hesla nejsou stejná, nebo jsou příliš krátká")
         return redirect(url_for("adduser"))
@@ -73,9 +87,10 @@ def login():
 
 
 @app.route("/login/", methods=["POST"])
+@db_session
 def login_post():
-    login = None
-    passwd = None
+    login = request.form.get("login")
+    passwd =request.form.get("passwd")
     user = User[login]
     if user and check_password_hash(user.password, passwd):
         session["user"] = login
@@ -90,3 +105,9 @@ def logout():
     session.pop("user", None)
     flash("Odhlášeno")
     return render_template("base.html.j2")
+
+    #@app.route("/", methods=["GET"])
+#def index():
+    #url = input("Enter your url")
+    #s = pyshorteners.Shortener().tinyurl.short(url)
+    #print("Your shorted is -->", s)
